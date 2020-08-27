@@ -71,11 +71,11 @@ func NewWallet(
 		return nil, errors.Wrap(err, "could not check if wallet exists")
 	}
 	if walletExists {
-		isEmptyWallet, err := IsEmptyWallet(walletDir)
+		IsEmptyWallet, err := IsEmptyWallet(walletDir)
 		if err != nil {
 			return nil, errors.Wrap(err, "could not check if wallet has files")
 		}
-		if !isEmptyWallet {
+		if !IsEmptyWallet {
 			return nil, ErrWalletExists
 		}
 	}
@@ -101,11 +101,11 @@ func OpenWallet(cliCtx *cli.Context) (*Wallet, error) {
 		return nil, errors.Wrap(err, "could not parse wallet directory")
 	}
 	if ok {
-		isEmptyWallet, err := IsEmptyWallet(walletDir)
+		IsEmptyWallet, err := IsEmptyWallet(walletDir)
 		if err != nil {
 			return nil, errors.Wrap(err, "could not check if wallet has files")
 		}
-		if isEmptyWallet {
+		if IsEmptyWallet {
 			return nil, ErrNoWalletFound
 		}
 	} else {
@@ -131,11 +131,11 @@ func WalletExists(directory string) error {
 		return errors.Wrap(err, "could not parse wallet directory")
 	}
 	if ok {
-		isEmptyWallet, err := IsEmptyWallet(directory)
+		IsEmptyWallet, err := IsEmptyWallet(directory)
 		if err != nil {
 			return errors.Wrap(err, "could not check if wallet has files")
 		}
-		if isEmptyWallet {
+		if IsEmptyWallet {
 			return ErrNoWalletFound
 		}
 		return nil
@@ -389,11 +389,11 @@ func openOrCreateWallet(cliCtx *cli.Context, creationFunc func(cliCtx *cli.Conte
 		return nil, errors.Wrapf(err, "could not check if wallet dir %s exists", directory)
 	}
 	if ok {
-		isEmptyWallet, err := isEmptyWallet(directory)
+		IsEmptyWallet, err := IsEmptyWallet(directory)
 		if err != nil {
 			return nil, errors.Wrap(err, "could not check if wallet has files")
 		}
-		if !isEmptyWallet {
+		if !IsEmptyWallet {
 			wallet, err := OpenWallet(cliCtx)
 			if err != nil {
 				return nil, errors.Wrap(err, "could not open wallet")
@@ -404,7 +404,7 @@ func openOrCreateWallet(cliCtx *cli.Context, creationFunc func(cliCtx *cli.Conte
 	return creationFunc(cliCtx)
 }
 
-// isEmptyWallet checks if a folder consists key directory such as `derived`, `remote` or `direct`.
+// IsEmptyWallet checks if a folder consists key directory such as `derived`, `remote` or `direct`.
 // Returns true if exists, false otherwise.
 func IsEmptyWallet(name string) (bool, error) {
 	expanded, err := fileutil.ExpandPath(name)
