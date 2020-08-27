@@ -96,46 +96,46 @@ func DefaultConfig() *Config {
 
 // NewKeymanager instantiates a new derived keymanager from configuration options.
 func NewKeymanager(
-	cliCtx *cli.Context,
+	ctx context.Context,
 	wallet iface.Wallet,
 	cfg *Config,
 	skipMnemonicConfirm bool,
+	accountsPassword string,
 ) (*Keymanager, error) {
-	walletExists, err := wallet.Exists()
-	if err != nil {
-		return nil, err
-	}
-	var accountsPassword string
-	// If the user does not have any accounts in their wallet, we ask them to
-	// set a new wallet password, which will be used for encrypting/decrypting
-	// their wallet secret to and from disk.
-	if !walletExists {
-		accountsPassword, err = inputPassword(
-			cliCtx,
-			flags.WalletPasswordFileFlag,
-			newWalletPasswordPromptText,
-			confirmPass,
-			promptutil.ValidatePasswordInput,
-		)
-	} else {
-		validateExistingPass := func(input string) error {
-			if input == "" {
-				return errors.New("password input cannot be empty")
-			}
-			return nil
-		}
-		accountsPassword, err = inputPassword(
-			cliCtx,
-			flags.WalletPasswordFileFlag,
-			walletPasswordPromptText,
-			noConfirmPass,
-			validateExistingPass,
-		)
-	}
+	//walletExists, err := wallet.Exists()
+	//if err != nil {
+	//	return nil, err
+	//}
+	//var accountsPassword string
+	//// If the user does not have any accounts in their wallet, we ask them to
+	//// set a new wallet password, which will be used for encrypting/decrypting
+	//// their wallet secret to and from disk.
+	//if !walletExists {
+	//	accountsPassword, err = inputPassword(
+	//		cliCtx,
+	//		flags.WalletPasswordFileFlag,
+	//		newWalletPasswordPromptText,
+	//		confirmPass,
+	//		promptutil.ValidatePasswordInput,
+	//	)
+	//} else {
+	//	validateExistingPass := func(input string) error {
+	//		if input == "" {
+	//			return errors.New("password input cannot be empty")
+	//		}
+	//		return nil
+	//	}
+	//	accountsPassword, err = inputPassword(
+	//		cliCtx,
+	//		flags.WalletPasswordFileFlag,
+	//		walletPasswordPromptText,
+	//		noConfirmPass,
+	//		validateExistingPass,
+	//	)
+	//}
 
 	// Check if the wallet seed file exists. If it does not, we initialize one
 	// by creating a new mnemonic and writing the encrypted file to disk.
-	ctx := context.Background()
 	var encodedSeedFile []byte
 	if !fileutil.FileExists(filepath.Join(wallet.AccountsDir(), EncryptedSeedFileName)) {
 		seedConfig, err := initializeWalletSeedFile(accountsPassword, skipMnemonicConfirm)

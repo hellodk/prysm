@@ -56,22 +56,23 @@ type Wallet struct {
 	keymanagerKind v2keymanager.Kind
 }
 
-// NewWallet given a set of configuration options, will leverage
-// create and write a new wallet to disk for a Prysm validator.
-func NewWallet(
-	cliCtx *cli.Context,
-	keymanagerKind v2keymanager.Kind,
-) (*Wallet, error) {
-	walletDir, err := inputDirectory(cliCtx, walletDirPromptText, flags.WalletDirFlag)
+// CreateWalletConfig --
+type CreateWalletConfig struct {
+	WalletDir      string
+	KeymanagerKind v2keymanager.Kind
+}
+
+// NewWallet --
+func NewWallet(ctx context.Context, conf *CreateWalletConfig) (*Wallet, error) {
 	// Check if the user has a wallet at the specified path.
 	// If a user does not have a wallet, we instantiate one
 	// based on specified options.
-	walletExists, err := fileutil.HasDir(walletDir)
+	walletExists, err := fileutil.HasDir(conf.WalletDir)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not check if wallet exists")
 	}
 	if walletExists {
-		IsEmptyWallet, err := IsEmptyWallet(walletDir)
+		IsEmptyWallet, err := IsEmptyWallet(conf.WalletDir)
 		if err != nil {
 			return nil, errors.Wrap(err, "could not check if wallet has files")
 		}
@@ -79,11 +80,11 @@ func NewWallet(
 			return nil, ErrWalletExists
 		}
 	}
-	accountsPath := filepath.Join(walletDir, keymanagerKind.String())
+	accountsPath := filepath.Join(conf.WalletDir, conf.KeymanagerKind.String())
 	return &Wallet{
 		accountsPath:   accountsPath,
-		keymanagerKind: keymanagerKind,
-		walletDir:      walletDir,
+		keymanagerKind: conf.KeymanagerKind,
+		walletDir:      conf.WalletDir,
 	}, nil
 }
 
