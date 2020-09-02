@@ -45,8 +45,8 @@ def prysm_deps():
         name = "com_github_ferranbt_fastssz",
         importpath = "github.com/ferranbt/fastssz",
         nofuzz = True,
-        sum = "h1:maoKvILdMk6CSWHanFcUdxXIZGKD9YpWIaVbUQ/4kfg=",
-        version = "v0.0.0-20200514094935-99fccaf93472",
+        sum = "h1:8DS7uDmUkGF6UKNU1HivEsjrTusxLPb05KUr/D8ONWQ=",
+        version = "v0.0.0-20200826142241-3a913c5a1313",
     )
     go_repository(
         name = "com_github_prysmaticlabs_bazel_go_ethereum",
@@ -1027,8 +1027,8 @@ def prysm_deps():
     go_repository(
         name = "com_github_mitchellh_mapstructure",
         importpath = "github.com/mitchellh/mapstructure",
-        sum = "h1:fmNYVwqnSfB9mZU6OS2O6GsXM+wcskZDuKQzvN1EDeE=",
-        version = "v1.1.2",
+        sum = "h1:mRS76wmkOn3KkKAyXDu42V+6ebnXWIztFSYGN7GeoRg=",
+        version = "v1.3.2",
     )
     go_repository(
         name = "com_github_mmcloughlin_avo",
@@ -2570,8 +2570,8 @@ def prysm_deps():
         name = "com_github_prysmaticlabs_ethereumapis",
         build_file_generation = "off",
         importpath = "github.com/prysmaticlabs/ethereumapis",
-        sum = "h1:GjYix8Y4VpQhlsjA2ickr3HxjIns4bI36zOmC+lwaNw=",
-        version = "v0.0.0-20200709024211-e8095222f77b",
+        sum = "h1:ncbkJHLhmQbnJy6AAIsotQtdo5psOlDWdEdvaaqR0j8=",
+        version = "v0.0.0-20200827165051-58ccb36e36b9",
     )
     go_repository(
         name = "com_github_prysmaticlabs_go_bitfield",
@@ -3613,4 +3613,10 @@ def prysm_deps():
         importpath = "github.com/gofrs/flock",
         sum = "h1:DP+LD/t0njgoPBvT5MJLeliUIVQR03hiKR6vezdwHlc=",
         version = "v0.7.1",
+    )
+    go_repository(
+        name = "com_github_go_fsnotify_fsnotify",
+        importpath = "github.com/go-fsnotify/fsnotify",
+        sum = "h1:PeVNzgTRtWGm6fVic5i21t+n5ptPGCZuMcSPVMyTWjs=",
+        version = "v0.0.0-20180321022601-755488143dae",
     )

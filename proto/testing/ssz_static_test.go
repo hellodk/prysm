@@ -64,7 +64,14 @@ func runSSZStaticTests(t *testing.T, config string) {
 				if rootsYaml.SigningRoot == "" {
 					return
 				}
-				signingRoot, err := ssz.HashTreeRoot(object)
+
+				var signingRoot [32]byte
+				if v, ok := object.(fssz.HashRoot); ok {
+					signingRoot, err = v.HashTreeRoot()
+				} else {
+					t.Fatal("object does not meet fssz.HashRoot")
+				}
+
 				require.NoError(t, err)
 				signingRootBytes, err := hex.DecodeString(rootsYaml.SigningRoot[2:])
 				require.NoError(t, err)
@@ -120,7 +127,7 @@ func UnmarshalledSSZ(t *testing.T, serializedBytes []byte, folderName string) (i
 	case "ProposerSlashing":
 		obj = &ethpb.ProposerSlashing{}
 	case "SignedAggregateAndProof":
-		obj = &pb.SignedAggregateAndProof{}
+		obj = &ethpb.SignedAggregateAttestationAndProof{}
 	case "SignedBeaconBlock":
 		obj = &ethpb.SignedBeaconBlock{}
 	case "SignedBeaconBlockHeader":

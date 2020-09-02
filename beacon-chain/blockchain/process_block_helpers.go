@@ -9,23 +9,16 @@ import (
 	ethpb "github.com/prysmaticlabs/ethereumapis/eth/v1alpha1"
 	"github.com/prysmaticlabs/prysm/beacon-chain/core/helpers"
 	stateTrie "github.com/prysmaticlabs/prysm/beacon-chain/state"
-	"github.com/prysmaticlabs/prysm/beacon-chain/state/stateutil"
 	"github.com/prysmaticlabs/prysm/shared/attestationutil"
 	"github.com/prysmaticlabs/prysm/shared/bytesutil"
 	"github.com/prysmaticlabs/prysm/shared/params"
-	"github.com/prysmaticlabs/prysm/shared/roughtime"
 	"github.com/prysmaticlabs/prysm/shared/traceutil"
 	"go.opencensus.io/trace"
 )
 
 // CurrentSlot returns the current slot based on time.
 func (s *Service) CurrentSlot() uint64 {
-	now := roughtime.Now().Unix()
-	genesis := s.genesisTime.Unix()
-	if now < genesis {
-		return 0
-	}
-	return uint64(now-genesis) / params.BeaconConfig().SecondsPerSlot
+	return helpers.CurrentSlot(uint64(s.genesisTime.Unix()))
 }
 
 // getBlockPreState returns the pre state of an incoming block. It uses the parent root of the block
@@ -360,7 +353,7 @@ func (s *Service) fillInForkChoiceMissingBlocks(ctx context.Context, blk *ethpb.
 	// Lower slots should be at the end of the list.
 	for i := len(pendingNodes) - 1; i >= 0; i-- {
 		b := pendingNodes[i]
-		r, err := stateutil.BlockRoot(b)
+		r, err := b.HashTreeRoot()
 		if err != nil {
 			return err
 		}

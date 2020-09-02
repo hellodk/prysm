@@ -2,11 +2,11 @@ package blocks_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"testing"
 
 	ethpb "github.com/prysmaticlabs/ethereumapis/eth/v1alpha1"
-	"github.com/prysmaticlabs/go-ssz"
 	"github.com/prysmaticlabs/prysm/beacon-chain/core/blocks"
 	"github.com/prysmaticlabs/prysm/beacon-chain/core/helpers"
 	pb "github.com/prysmaticlabs/prysm/proto/beacon/p2p/v1"
@@ -26,18 +26,19 @@ func TestProcessRandao_IncorrectProposerFailsVerification(t *testing.T) {
 	binary.LittleEndian.PutUint64(buf, epoch)
 	domain, err := helpers.Domain(beaconState.Fork(), epoch, params.BeaconConfig().DomainRandao, beaconState.GenesisValidatorRoot())
 	require.NoError(t, err)
-	root, err := ssz.HashTreeRoot(&pb.SigningData{ObjectRoot: buf, Domain: domain})
+	root, err := (&pb.SigningData{ObjectRoot: buf, Domain: domain}).HashTreeRoot()
 	require.NoError(t, err)
 	// We make the previous validator's index sign the message instead of the proposer.
 	epochSignature := privKeys[proposerIdx-1].Sign(root[:])
-	block := &ethpb.BeaconBlock{
+	b := testutil.NewBeaconBlock()
+	b.Block = &ethpb.BeaconBlock{
 		Body: &ethpb.BeaconBlockBody{
 			RandaoReveal: epochSignature.Marshal(),
 		},
 	}
 
 	want := "block randao: signature did not verify"
-	_, err = blocks.ProcessRandao(beaconState, block.Body)
+	_, err = blocks.ProcessRandao(context.Background(), beaconState, b)
 	assert.ErrorContains(t, want, err)
 }
 
@@ -48,15 +49,17 @@ func TestProcessRandao_SignatureVerifiesAndUpdatesLatestStateMixes(t *testing.T)
 	epochSignature, err := testutil.RandaoReveal(beaconState, epoch, privKeys)
 	require.NoError(t, err)
 
-	block := &ethpb.BeaconBlock{
+	b := testutil.NewBeaconBlock()
+	b.Block = &ethpb.BeaconBlock{
 		Body: &ethpb.BeaconBlockBody{
 			RandaoReveal: epochSignature,
 		},
 	}
 
 	newState, err := blocks.ProcessRandao(
+		context.Background(),
 		beaconState,
-		block.Body,
+		b,
 	)
 	require.NoError(t, err, "Unexpected error processing block randao")
 	currentEpoch := helpers.CurrentEpoch(beaconState)

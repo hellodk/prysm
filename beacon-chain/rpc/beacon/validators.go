@@ -14,7 +14,6 @@ import (
 	statetrie "github.com/prysmaticlabs/prysm/beacon-chain/state"
 	"github.com/prysmaticlabs/prysm/shared/bytesutil"
 	"github.com/prysmaticlabs/prysm/shared/cmd"
-	"github.com/prysmaticlabs/prysm/shared/featureconfig"
 	"github.com/prysmaticlabs/prysm/shared/pagination"
 	"github.com/prysmaticlabs/prysm/shared/params"
 	"google.golang.org/grpc/codes"
@@ -262,7 +261,7 @@ func (bs *Server) ListValidators(
 		}
 	}
 
-	if !featureconfig.Get().NewStateMgmt && requestedEpoch < currentEpoch {
+	if requestedEpoch < currentEpoch {
 		stopIdx := len(validatorList)
 		for idx, item := range validatorList {
 			// The first time we see a validator with an activation epoch > the requested epoch,
@@ -474,8 +473,10 @@ func (bs *Server) GetValidatorParticipation(
 			requestedEpoch,
 		)
 	}
-
-	requestedState, err := bs.StateGen.StateBySlot(ctx, helpers.StartSlot(requestedEpoch+1))
+	// Calculate the end slot of the next epoch.
+	// Ex: requested epoch 1, this gets slot 95.
+	nextEpochEndSlot := helpers.StartSlot(requestedEpoch+2) - 1
+	requestedState, err := bs.StateGen.StateBySlot(ctx, nextEpochEndSlot)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "Could not get state")
 	}
@@ -486,9 +487,8 @@ func (bs *Server) GetValidatorParticipation(
 	}
 	_, b, err = precompute.ProcessAttestations(ctx, requestedState, v, b)
 	if err != nil {
-		return nil, status.Error(codes.Internal, "Could not pre compute attestations")
+		return nil, status.Errorf(codes.Internal, "Could not pre compute attestations: %v", err)
 	}
-
 	headState, err := bs.HeadFetcher.HeadState(ctx)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "Could not get head state")
@@ -498,9 +498,17 @@ func (bs *Server) GetValidatorParticipation(
 		Epoch:     requestedEpoch,
 		Finalized: requestedEpoch <= headState.FinalizedCheckpointEpoch(),
 		Participation: &ethpb.ValidatorParticipation{
-			GlobalParticipationRate: float32(b.PrevEpochTargetAttested) / float32(b.ActivePrevEpoch),
-			VotedEther:              b.PrevEpochTargetAttested,
-			EligibleEther:           b.ActivePrevEpoch,
+			// TODO(7130): Remove these three deprecated fields.
+			GlobalParticipationRate:          float32(b.PrevEpochTargetAttested) / float32(b.ActivePrevEpoch),
+			VotedEther:                       b.PrevEpochTargetAttested,
+			EligibleEther:                    b.ActivePrevEpoch,
+			CurrentEpochActiveGwei:           b.ActiveCurrentEpoch,
+			CurrentEpochAttestingGwei:        b.CurrentEpochAttested,
+			CurrentEpochTargetAttestingGwei:  b.CurrentEpochTargetAttested,
+			PreviousEpochActiveGwei:          b.ActivePrevEpoch,
+			PreviousEpochAttestingGwei:       b.PrevEpochAttested,
+			PreviousEpochTargetAttestingGwei: b.PrevEpochTargetAttested,
+			PreviousEpochHeadAttestingGwei:   b.PrevEpochHeadAttested,
 		},
 	}, nil
 }

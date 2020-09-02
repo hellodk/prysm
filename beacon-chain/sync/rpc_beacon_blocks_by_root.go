@@ -9,7 +9,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/pkg/errors"
 	"github.com/prysmaticlabs/prysm/beacon-chain/p2p"
-	"github.com/prysmaticlabs/prysm/beacon-chain/state/stateutil"
 	"github.com/prysmaticlabs/prysm/shared/params"
 )
 
@@ -43,7 +42,7 @@ func (s *Service) sendRecentBeaconBlocksRequest(ctx context.Context, blockRoots 
 			return err
 		}
 
-		blkRoot, err := stateutil.BlockRoot(blk.Block)
+		blkRoot, err := blk.Block.HashTreeRoot()
 		if err != nil {
 			return err
 		}
@@ -69,9 +68,15 @@ func (s *Service) beaconBlocksRootRPCHandler(ctx context.Context, msg interface{
 
 	blockRoots, ok := msg.([][32]byte)
 	if !ok {
-		return errors.New("message is not type BeaconBlocksByRootRequest")
+		return errors.New("message is not type [][32]byte")
+	}
+	if err := s.rateLimiter.validateRequest(stream, uint64(len(blockRoots))); err != nil {
+		return err
 	}
 	if len(blockRoots) == 0 {
+		// Add to rate limiter in the event no
+		// roots are requested.
+		s.rateLimiter.add(stream, 1)
 		resp, err := s.generateErrorResponse(responseCodeInvalidRequest, "no block roots provided in request")
 		if err != nil {
 			log.WithError(err).Debug("Failed to generate a response error")
@@ -79,9 +84,6 @@ func (s *Service) beaconBlocksRootRPCHandler(ctx context.Context, msg interface{
 			log.WithError(err).Debugf("Failed to write to stream")
 		}
 		return errors.New("no block roots provided")
-	}
-	if err := s.rateLimiter.validateRequest(stream, uint64(len(blockRoots))); err != nil {
-		return err
 	}
 
 	if uint64(len(blockRoots)) > params.BeaconNetworkConfig().MaxRequestBlocks {

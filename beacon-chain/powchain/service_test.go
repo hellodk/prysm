@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 	protodb "github.com/prysmaticlabs/prysm/proto/beacon/db"
 	"github.com/prysmaticlabs/prysm/shared/event"
 	"github.com/prysmaticlabs/prysm/shared/params"
+	"github.com/prysmaticlabs/prysm/shared/testutil"
 	"github.com/prysmaticlabs/prysm/shared/testutil/assert"
 	"github.com/prysmaticlabs/prysm/shared/testutil/require"
 	logTest "github.com/sirupsen/logrus/hooks/test"
@@ -72,44 +74,24 @@ type goodFetcher struct {
 	backend *backends.SimulatedBackend
 }
 
-func (g *goodFetcher) BlockByHash(ctx context.Context, hash common.Hash) (*gethTypes.Block, error) {
+func (g *goodFetcher) HeaderByHash(ctx context.Context, hash common.Hash) (*gethTypes.Header, error) {
 	if bytes.Equal(hash.Bytes(), common.BytesToHash([]byte{0}).Bytes()) {
 		return nil, fmt.Errorf("expected block hash to be nonzero %v", hash)
 	}
 	if g.backend == nil {
-		return gethTypes.NewBlock(
-			&gethTypes.Header{
-				Number: big.NewInt(0),
-			},
-			[]*gethTypes.Transaction{},
-			[]*gethTypes.Header{},
-			[]*gethTypes.Receipt{},
-		), nil
+		return &gethTypes.Header{
+			Number: big.NewInt(0),
+		}, nil
 	}
-	return g.backend.Blockchain().GetBlockByHash(hash), nil
+	return g.backend.Blockchain().GetHeaderByHash(hash), nil
 
-}
-
-func (g *goodFetcher) BlockByNumber(ctx context.Context, number *big.Int) (*gethTypes.Block, error) {
-	if g.backend == nil {
-		return gethTypes.NewBlock(
-			&gethTypes.Header{
-				Number: big.NewInt(15),
-				Time:   150,
-			},
-			[]*gethTypes.Transaction{},
-			[]*gethTypes.Header{},
-			[]*gethTypes.Receipt{},
-		), nil
-	}
-
-	return g.backend.Blockchain().GetBlockByNumber(number.Uint64()), nil
 }
 
 func (g *goodFetcher) HeaderByNumber(ctx context.Context, number *big.Int) (*gethTypes.Header, error) {
 	if g.backend == nil {
 		return &gethTypes.Header{
-			Number: big.NewInt(0),
+			Number: big.NewInt(15),
+			Time:   150,
 		}, nil
 	}
 	if number == nil {
@@ -151,6 +133,94 @@ func TestStart_OK(t *testing.T) {
 	}
 	hook.Reset()
 	web3Service.cancel()
+}
+
+func TestStart_NoHTTPEndpointDefinedFails_WithoutChainStarted(t *testing.T) {
+	hook := logTest.NewGlobal()
+	beaconDB, _ := dbutil.SetupDB(t)
+	testAcc, err := contracts.Setup()
+	require.NoError(t, err, "Unable to set up simulated backend")
+	s, err := NewService(context.Background(), &Web3ServiceConfig{
+		HTTPEndPoint:    "", // No endpoint defined!
+		DepositContract: testAcc.ContractAddr,
+		BeaconDB:        beaconDB,
+	})
+	require.NoError(t, err)
+	// Set custom exit func so test can proceed
+	log.Logger.ExitFunc = func(i int) {
+		panic(i)
+	}
+	defer func() {
+		log.Logger.ExitFunc = nil
+	}()
+	wg := new(sync.WaitGroup)
+	wg.Add(1)
+	// Expect Start function to fail from a fatal call due
+	// to no state existing.
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				wg.Done()
+			}
+		}()
+		s.Start()
+	}()
+	testutil.WaitTimeout(wg, time.Second)
+	require.LogsContain(t, hook, "cannot create genesis state: no eth1 http endpoint defined")
+	hook.Reset()
+}
+
+func TestStart_NoHTTPEndpointDefinedSucceeds_WithGenesisState(t *testing.T) {
+	hook := logTest.NewGlobal()
+	beaconDB, _ := dbutil.SetupDB(t)
+	testAcc, err := contracts.Setup()
+	require.NoError(t, err, "Unable to set up simulated backend")
+	st, _ := testutil.DeterministicGenesisState(t, 10)
+	b := testutil.NewBeaconBlock()
+	genRoot, err := b.HashTreeRoot()
+	require.NoError(t, err)
+	require.NoError(t, beaconDB.SaveState(context.Background(), st, genRoot))
+	require.NoError(t, beaconDB.SaveGenesisBlockRoot(context.Background(), genRoot))
+	s, err := NewService(context.Background(), &Web3ServiceConfig{
+		HTTPEndPoint:    "", // No endpoint defined!
+		DepositContract: testAcc.ContractAddr,
+		BeaconDB:        beaconDB,
+	})
+	require.NoError(t, err)
+
+	wg := new(sync.WaitGroup)
+	wg.Add(1)
+
+	go func() {
+		s.Start()
+		wg.Done()
+	}()
+	s.cancel()
+	testutil.WaitTimeout(wg, time.Second)
+	require.LogsDoNotContain(t, hook, "cannot create genesis state: no eth1 http endpoint defined")
+	hook.Reset()
+}
+
+func TestStart_NoHTTPEndpointDefinedSucceeds_WithChainStarted(t *testing.T) {
+	hook := logTest.NewGlobal()
+	beaconDB, _ := dbutil.SetupDB(t)
+	testAcc, err := contracts.Setup()
+	require.NoError(t, err, "Unable to set up simulated backend")
+
+	require.NoError(t, beaconDB.SavePowchainData(context.Background(), &protodb.ETH1ChainData{
+		ChainstartData: &protodb.ChainStartData{Chainstarted: true},
+		Trie:           &protodb.SparseMerkleTrie{},
+	}))
+	s, err := NewService(context.Background(), &Web3ServiceConfig{
+		HTTPEndPoint:    "", // No endpoint defined!
+		DepositContract: testAcc.ContractAddr,
+		BeaconDB:        beaconDB,
+	})
+	require.NoError(t, err)
+
+	s.Start()
+	require.LogsDoNotContain(t, hook, "cannot create genesis state: no eth1 http endpoint defined")
+	hook.Reset()
 }
 
 func TestStop_OK(t *testing.T) {
